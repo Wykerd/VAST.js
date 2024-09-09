@@ -25,6 +25,8 @@
  */
 
 
+const http = require('http');
+
 const matcher = require('../lib/matcher.js');
 // const UTIL = require('../lib/util.js');
 require('dotenv').config()
@@ -53,7 +55,7 @@ UTIL.lookupIP(gwHost, function (addr) {
       GW_port: gwPort,
       VON_port: vonPort,
       client_port: clientPort,
-      alias: "Matcher " + alias,
+      alias: alias,
       logDisplayLevel: 5,
       logRecordLevel: 5,
       eventDisplayLevel: 5,
@@ -63,4 +65,34 @@ UTIL.lookupIP(gwHost, function (addr) {
       console.log('Matcher: ' + alias + ' created with ID: ' + id);
     }
   );
+
+  http.createServer(async (req, res) => {
+    // server sent events
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD',
+    });
+
+    if (req.method === 'HEAD' || req.method === 'OPTIONS') {
+      res.end();
+      return;
+    }
+
+    console.log('Inspector: new connection to event stream');
+  
+    res.write('data: ' + JSON.stringify({
+      event: -1,
+      time: Date.now(),
+      ...M.getInfo(),
+    }) + '\n\n');
+
+    M.events.on('matcher-event', function (event) {
+      res.write('data: ' + JSON.stringify(event) + '\n\n');
+    });
+  }).listen(3344, '0.0.0.0', () => {
+    console.log('Inspector server running at http://0.0.0.0:3344/');
+  });
 });

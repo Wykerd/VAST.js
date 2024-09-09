@@ -17,44 +17,42 @@
  * - radius: The search radius of the client (default: 10) (Currently unused.)
  * 
  * Example:
- * node new_client.js 1 192.168.1.10 20000 500 600 10
+ * node new_client.js TestC 127.0.0.1 20000 200 200 10
  * 
  */
 
 const client = require('../lib/client');
+const readline = require('readline');
 require('../lib/common.js');
 require('dotenv').config();
 
-const readline = require('readline'); // allows the client server to read user input in the terminal
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: 'Enter command: '
+    prompt: '> '
 });
 
 const SIZE = 1000; // world size
 
-const alias = parseInt(process.argv[2], 10) || 1;
+const alias = process.argv[2] || "1";
 const gwHost = process.argv[3] || "127.0.0.1";
 const gwPort = parseInt(process.argv[4], 10) || 8000;
 
-// my position and AoI to subscribe for PONG messages
-var x = parseFloat(process.argv[5]) || Math.random() * SIZE;
-var y = parseFloat(process.argv[6]) || Math.random() * SIZE;
-var r = parseFloat(process.argv[7]) || 10; // radius
+const x = parseFloat(process.argv[5]) || Math.random() * SIZE;
+const y = parseFloat(process.argv[6]) || Math.random() * SIZE;
+const r = parseFloat(process.argv[7]) || 10; // radius
 
-var wait_to_ping = parseInt(process.argv[8]) || 1000; // wait 1 min for all clients to finish joining
-var ping_refresh_time = parseInt(process.argv[9]) || 1000; // time between pings
+const C = new client(gwHost, gwPort, alias, x, y, r, function (id) {
+    _id = id;
+    console.log(`Client REPL started. Connected with ID '${id}' to matcher #${C.getMatcherID()}`);
 
-var _id;
-var C;
-
-// UTIL.lookupIP("127.0.0.1", function (addr) {
-    // GW_addr = addr;
+    rl.prompt();
+});
 
 function processInput(input) {
     const [command, ...args] = input.split(' ');
-    if (command === 'help') {
+    switch (command) {
+        case 'help':
             console.log(`
     Available commands:
     - subscribe <x> <y> <radius> <channel>: Subscribe to a channel at a specific AoI.
@@ -65,85 +63,78 @@ function processInput(input) {
     - clearsubscriptions: Clear all client subscriptions.
     - help: Display this help message.
             `);
-    }
-    if (command === 'subscribe') {
-        if (args.length === 4) {
-            const x = parseFloat(args[0]);
-            const y = parseFloat(args[1]);
-            const radius = parseFloat(args[2]);
-            const channel = args[3];
+            break;
+        case 'subscribe':
+            if (args.length === 4) {
+                const x = parseFloat(args[0]);
+                const y = parseFloat(args[1]);
+                const radius = parseFloat(args[2]);
+                const channel = args[3];
 
-            C.subscribe({x: x, y: y, radius: radius}, channel);
-            console.log(`Subscribed to channel '${channel}' at AoI [${x}; ${y}; ${radius}]`);
-        } else {
-            console.log('Invalid arguments. Usage: subscribe <x> <y> <radius> <channel>');
-        }
-    } else if (command === 'square_sub') {
-        const test_points = [
-            { x: 50, y: 50 },
-            { x: 300, y: 50 },
-            { x: 50, y: 300 },
-            { x: 300, y: 300 }
-        ];
+                C.subscribe({x: x, y: y, radius: radius}, channel);
+                console.log(`Subscribed to channel '${channel}' at AoI [${x}; ${y}; ${radius}]`);
+            } else {
+                console.log('Invalid arguments. Usage: subscribe <x> <y> <radius> <channel>');
+            }
+            break;
+        case 'square_sub':
+            const test_points = [
+                { x: 50, y: 50 },
+                { x: 300, y: 50 },
+                { x: 50, y: 300 },
+                { x: 300, y: 300 }
+            ];
 
-        C.subscribe(test_points, "clientBound");
+            C.subscribe(test_points, "overlay-sps");
+            break;
+        case 'publish':
+            if (args.length === 5) {
+                const x = parseFloat(args[0]);
+                const y = parseFloat(args[1]);
+                const radius = parseFloat(args[2]);
+                const payload = args[3];
+                const channel = args[4];
 
-    } else if (command === 'publish') {
-        if (args.length === 5) {
-            const x = parseFloat(args[0]);
-            const y = parseFloat(args[1]);
-            const radius = parseFloat(args[2]);
-            const payload = args[3];
-            const channel = args[4];
+                C.publish(x, y, radius, payload, channel);
+                console.log(`Published to channel '${channel}' with payload '${payload}' at AoI [${x}; ${y}; ${radius}]`);
+            } else {
+                console.log('Invalid arguments. Usage: publish <x> <y> <radius> <payload> <channel>');
+            }
+            break;
+        case 'unsubscribe':
+            if (args.length === 1) {
+                const subID = args[0];
 
-            C.publish(x, y, radius, payload, channel);
-            console.log(`Published to channel '${channel}' with payload '${payload}' at AoI [${x}; ${y}; ${radius}]`);
-        } else {
-            console.log('Invalid arguments. Usage: publish <x> <y> <radius> <payload> <channel>');
-        }
-    } else if (command === 'unsubscribe') {
-        if (args.length === 1) {
-            const subID = args[0];
+                C.unsubscribe(subID);
+                console.log(`Unsubscribed from subscription with ID '${subID}'`);
+            } else {
+                console.log('Invalid arguments. Usage: unsubscribe <subID>');
+            }
+            break;
+        case 'move':
+            if (args.length === 2) {
+                const x = parseFloat(args[0]);
+                const y = parseFloat(args[1]);
 
-            C.unsubscribe(subID);
-            console.log(`Unsubscribed from subscription with ID '${subID}'`);
-        } else {
-            console.log('Invalid arguments. Usage: unsubscribe <subID>');
-        }
-    } else if (command === 'move') {
-        if (args.length === 2) {
-            const x = parseFloat(args[0]);
-            const y = parseFloat(args[1]);
-
-            C.move(x, y);
-            console.log(`Moved client to position [${x}; ${y}]`);
-        } else {
-            console.log('Invalid arguments. Usage: move <x> <y>');
-        }
-    } else if (command === 'disconnect') {
-        C.disconnect();
-        console.log('Disconnected client from matcher');
-    } else if (command === 'clearsubscriptions') {
-        C.clearSubscriptions();
-        console.log('Cleared all subscriptions');
-    } else {
-        console.log('Invalid command. Available commands: subscribe, publish, unsubscribe, move, disconnect, clearsubscriptions');
+                C.move(x, y);
+                console.log(`Moved client to position [${x}; ${y}]`);
+            } else {
+                console.log('Invalid arguments. Usage: move <x> <y>');
+            }
+            break;
+        case 'disconnect':
+            C.disconnect();
+            console.log('Disconnected client from matcher');
+            break;
+        case 'clearsubscriptions':
+            C.clearSubscriptions();
+            console.log('Cleared all subscriptions');
+            break;
+        default:
+            console.log('Invalid command. Available commands: subscribe, publish, unsubscribe, move, disconnect, clearsubscriptions');
     }
 
     rl.prompt();
 }
-    
 
 rl.on('line', processInput);
-
-
-
-C = new client(null, gwHost, gwPort, alias, x, y, r, function (id) {
-    _id = id;
-    console.log("Client " + alias + " successfully created");
-    let m = C.getMatcherID();
-    console.log("Assigned to matcher with id " + m);
-
-    rl.prompt();
-});
-// });
