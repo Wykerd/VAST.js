@@ -1,4 +1,4 @@
-import WebSocket, { RawData } from 'ws';
+import WebSocket, { CLOSED, RawData } from 'ws';
 import { decodeBinary as decodeServerProto } from './proto/generated/messages/VASTServerMessage';
 import { encodeBinary as encodeClientProto } from './proto/generated/messages/VASTClientMessage';
 import { Addr, PubSubMessage, Subscribe, VASTServerMessage, Vec2d } from './proto/generated/messages';
@@ -197,7 +197,7 @@ export class VASTWebSocketClient extends EventEmitter {
     }
 
     async connect() {
-        if (!this.ws.CLOSED) this.ws.close();
+        if (this.ws.readyState != CLOSED) this.ws.close();
 
         this.#connected = false;
 
