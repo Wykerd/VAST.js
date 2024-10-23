@@ -60,8 +60,6 @@ export class VASTWebSocketClient extends EventEmitter {
         this.ws.on('message', (data) => {
             const server_message = decodeServerProto(new Uint8Array(convertToArrayBuffer(data)));
 
-            console.log('Received message:', server_message);
-
             this.#handleMessage(server_message);
         });
 
